@@ -1,0 +1,62 @@
+/* src/components/TranscriptionPad.module.css */
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem; /* Space between elements */
+  background-color: #242424;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 700px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.status {
+  font-size: 1rem;
+  color: #9e9e9e;
+  min-height: 1.5rem;
+  text-align: center;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 200px;
+  background-color: #1a1a1a;
+  border: 1px solid #424242;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 1rem;
+  padding: 0.75rem;
+  resize: vertical;
+  box-sizing: border-box; /* Important for padding */
+}
+
+.controls {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: white;
+  transition: background-color 0.2s ease;
+}
+
+.recordButton {
+  background-color: #4CAF50; /* Green */
+}
+.recordButton:hover {
+  background-color: #45a049;
+}
+
+.secondaryButton {
+  background-color: #616161;
+}
+.secondaryButton:hover {
+  background-color: #757575;
+}

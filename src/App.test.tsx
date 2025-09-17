@@ -4,20 +4,14 @@ import { describe, it, expect } from 'vitest';
 import App from './App';
 
 describe('App Component', () => {
-  it('renders the main heading', () => {
-    // Arrange: Render the component to our virtual screen
+  it('should render the main TranscriptionPad component', () => {
+    // 1. Arrange: Render the main App component
     render(<App />);
 
-    // Act: Query the screen to find the element we expect
-    const headingElement = screen.getByText(/Speech-to-Text/i);
-
-    // Assert: Check if the element was actually found in the document
-    expect(headingElement).toBeInTheDocument();
-  });
-
-  it('renders the ready message', () => {
-    render(<App />);
-    const readyMessage = screen.getByText(/Ready to transcribe/i);
-    expect(readyMessage).toBeInTheDocument();
+    // 2. Act/Assert: Check if a key element from its child component is visible.
+    // We'll check for the main record button. If it's here, we know the
+    // TranscriptionPad was rendered successfully.
+    const recordButton = screen.getByRole('button', { name: /start recording/i });
+    expect(recordButton).toBeInTheDocument();
   });
 });
