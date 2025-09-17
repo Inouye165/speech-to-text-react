@@ -1,69 +1,45 @@
-# React + TypeScript + Vite
+# Speech-to-Text Web Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A responsive web application that converts speech from a microphone into editable text in real-time. Built with React, TypeScript, and Vite.
 
-Currently, two official plugins are available:
+![Demo GIF Placeholder](https://via.placeholder.com/700x400/242424/FFFFFF?text=App+Demo+GIF+Goes+Here)
+*(A GIF of the application in action would be a great addition here!)*
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+---
 
-## Expanding the ESLint configuration
+## Features
+- ✅ Real-time speech transcription
+- ✅ Manual text editing and clearing
+- ⏳ Copy transcribed text to clipboard (coming soon)
+- 🖥️ Modern, responsive user interface
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## How It Works
 
-```js
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+This application uses the browser's built-in **Web Speech API** (`SpeechRecognition`) for its core functionality. All audio processing is handled directly in the browser, making it fast and private.
 
-      // Remove tseslint.configs.recommended and replace with this
-      ...tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      ...tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      ...tseslint.configs.stylisticTypeChecked,
+The application state and API logic are managed by a custom React Hook (`useSpeechRecognition`), which keeps the UI components clean and focused on presentation.
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Tech Stack
+- **Framework:** React with TypeScript
+- **Build Tool:** Vite
+- **Testing:** Vitest & React Testing Library
+- **Styling:** CSS Modules
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Browser Compatibility
+The Web Speech API is currently a non-standard technology. As such, this application is only fully functional in **Chromium-based browsers**:
+- ✅ Google Chrome
+- ✅ Microsoft Edge
+- ❌ Mozilla Firefox (Not Supported)
+- ❌ Apple Safari (Not Supported)
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+A future update will include a cloud-based fallback to support all browsers.
 
-export default tseslint.config([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+## Getting Started
+
+1.  Clone the repository.
+2.  Install dependencies: `npm install`
+3.  Run the development server: `npm run dev`
+
+## Available Scripts
+- `npm run dev`: Starts the development server.
+- `npm test`: Runs the unit tests.
