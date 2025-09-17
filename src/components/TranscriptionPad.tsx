@@ -1,47 +1,46 @@
 // src/components/TranscriptionPad.tsx
-import { useState } from 'react'; // Import ONLY useState
 import styles from './TranscriptionPad.module.css';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
 
 export function TranscriptionPad() {
-  // --- STATE MANAGEMENT ---
-  const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [transcribedText, setTranscribedText] = useState<string>('');
-
-  // --- EVENT HANDLERS ---
-  const handleRecordClick = () => {
-    setIsRecording((prevState) => !prevState);
-  };
-
-  const handleClearClick = () => {
-    setTranscribedText('');
-  };
+  const {
+    isListening,
+    transcript,
+    setTranscript, // <-- NEW: Get the setter function
+    startListening,
+    stopListening,
+    hasRecognitionSupport,
+  } = useSpeechRecognition();
 
   return (
     <div className={styles.container}>
       <p className={styles.status}>
-        {isRecording ? 'Recording in progress...' : 'Press "Start Recording" to begin.'}
+        {isListening ? 'Recording in progress...' : 'Press "Start Recording" to begin.'}
+        {!hasRecognitionSupport &&
+          ' (Warning: Your browser does not support speech recognition.)'}
       </p>
 
       <textarea
         className={styles.textarea}
         placeholder="Your transcribed text will appear here..."
-        value={transcribedText}
-        onChange={(e) => setTranscribedText(e.target.value)}
+        value={transcript} // <-- Bind value to transcript from hook
+        onChange={(e) => setTranscript(e.target.value)} // <-- Allow manual edits
       />
 
       <div className={styles.controls}>
         <button
           className={`${styles.button} ${styles.recordButton}`}
-          onClick={handleRecordClick}
+          onClick={isListening ? stopListening : startListening}
+          disabled={!hasRecognitionSupport}
         >
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
+          {isListening ? 'Stop Recording' : 'Start Recording'}
         </button>
         <button className={`${styles.button} ${styles.secondaryButton}`}>
           Copy Text
         </button>
         <button
           className={`${styles.button} ${styles.secondaryButton}`}
-          onClick={handleClearClick}
+          onClick={() => setTranscript('')} // <-- Wire up the Clear button
         >
           Clear Text
         </button>

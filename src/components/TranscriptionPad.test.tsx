@@ -1,72 +1,97 @@
 // src/components/TranscriptionPad.test.tsx
-import { render, screen, fireEvent } from '@testing-library/react'; // Add fireEvent
-import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import { TranscriptionPad } from './TranscriptionPad';
+import useSpeechRecognition from '../hooks/useSpeechRecognition';
 
-// Test suite for the initial, static render
-describe('TranscriptionPad Component (Static Render)', () => {
-  beforeEach(() => {
+// --- MOCK SETUP ---
+// We tell Vitest to replace the real hook with a fake one.
+vi.mock('../hooks/useSpeechRecognition');
+
+// --- TEST SUITE ---
+describe('TranscriptionPad Component', () => {
+
+  // Create mock functions that we can track
+  const mockStartListening = vi.fn();
+  const mockStopListening = vi.fn();
+  const mockSetTranscript = vi.fn();
+
+  it('should render correctly in the default (non-listening) state', () => {
+    // Arrange: Define the mock's return value for this test
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: '',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
+
+    // Act: Render the component
     render(<TranscriptionPad />);
-  });
 
-  it('should render the initial status message', () => {
+    // Assert: Check for initial text and buttons
     expect(screen.getByText('Press "Start Recording" to begin.')).toBeInTheDocument();
-  });
-
-  it('should render the main record button', () => {
     expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument();
   });
 
-  it('should render the textarea for transcription', () => {
-    expect(screen.getByPlaceholderText('Your transcribed text will appear here...')).toBeInTheDocument();
-  });
+  it('should display the correct UI when in the listening state', () => {
+    // Arrange: This time, we set isListening to true
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: true,
+      transcript: 'Testing...',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
 
-  it('should render the Copy and Clear buttons', () => {
-    expect(screen.getByRole('button', { name: /copy text/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /clear text/i })).toBeInTheDocument();
-  });
-});
-
-// New test suite for user interactions
-describe('TranscriptionPad Component (User Interactions)', () => {
-  beforeEach(() => {
+    // Act: Render the component
     render(<TranscriptionPad />);
+
+    // Assert: Check for the "listening" state UI
+    expect(screen.getByText('Recording in progress...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Testing...')).toBeInTheDocument();
   });
 
-  it('should toggle recording state and text on button click', () => {
+  it('should call startListening when the record button is clicked', () => {
+    // Arrange
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: '',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
+    render(<TranscriptionPad />);
     const recordButton = screen.getByRole('button', { name: /start recording/i });
 
-    // 1. First Click: Start recording
+    // Act: Click the button
     fireEvent.click(recordButton);
-    expect(screen.getByRole('button', { name: /stop recording/i })).toBeInTheDocument();
-    expect(screen.getByText('Recording in progress...')).toBeInTheDocument();
 
-    // 2. Second Click: Stop recording
-    fireEvent.click(recordButton);
-    expect(screen.getByRole('button', { name: /start recording/i })).toBeInTheDocument();
-    expect(screen.getByText('Press "Start Recording" to begin.')).toBeInTheDocument();
+    // Assert: Check that our mock function was called
+    expect(mockStartListening).toHaveBeenCalledOnce();
   });
 
-  it('should allow user to type in the textarea', () => {
-    const textarea = screen.getByPlaceholderText<HTMLTextAreaElement>('Your transcribed text will appear here...');
-
-    fireEvent.change(textarea, { target: { value: 'Hello world' } });
-
-    expect(textarea.value).toBe('Hello world');
-  });
-
-  it('should clear the textarea when the clear button is clicked', () => {
-    const textarea = screen.getByPlaceholderText<HTMLTextAreaElement>('Your transcribed text will appear here...');
+  it('should call the setTranscript function when the clear button is clicked', () => {
+    // Arrange
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: 'Some text',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
+    render(<TranscriptionPad />);
     const clearButton = screen.getByRole('button', { name: /clear text/i });
-
-    // 1. Type something into the textarea
-    fireEvent.change(textarea, { target: { value: 'Some text to clear' } });
-    expect(textarea.value).toBe('Some text to clear');
-
-    // 2. Click the clear button
+    
+    // Act: Click the button
     fireEvent.click(clearButton);
 
-    // 3. Assert the textarea is now empty
-    expect(textarea.value).toBe('');
+    // Assert: Check that the hook's setter was called with an empty string
+    expect(mockSetTranscript).toHaveBeenCalledWith('');
   });
 });
