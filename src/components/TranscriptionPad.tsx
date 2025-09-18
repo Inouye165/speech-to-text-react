@@ -6,7 +6,8 @@ export function TranscriptionPad() {
   const {
     isListening,
     transcript,
-    setTranscript, // <-- NEW: Get the setter function
+    setTranscript,
+    error, // <-- NEW: Get the error message
     startListening,
     stopListening,
     hasRecognitionSupport,
@@ -14,17 +15,21 @@ export function TranscriptionPad() {
 
   return (
     <div className={styles.container}>
-      <p className={styles.status}>
-        {isListening ? 'Recording in progress...' : 'Press "Start Recording" to begin.'}
-        {!hasRecognitionSupport &&
-          ' (Warning: Your browser does not support speech recognition.)'}
-      </p>
+      {/* --- NEW: Conditional Error Display --- */}
+      {error ? (
+        <p className={styles.error}>{error}</p>
+      ) : (
+        <p className={styles.status}>
+          {isListening ? 'Recording in progress...' : 'Press "Start Recording" to begin.'}
+          {!hasRecognitionSupport && ' (Warning: Your browser does not support speech recognition.)'}
+        </p>
+      )}
 
       <textarea
         className={styles.textarea}
         placeholder="Your transcribed text will appear here..."
-        value={transcript} // <-- Bind value to transcript from hook
-        onChange={(e) => setTranscript(e.target.value)} // <-- Allow manual edits
+        value={transcript}
+        onChange={(e) => setTranscript(e.target.value)}
       />
 
       <div className={styles.controls}>
@@ -35,12 +40,10 @@ export function TranscriptionPad() {
         >
           {isListening ? 'Stop Recording' : 'Start Recording'}
         </button>
-        <button className={`${styles.button} ${styles.secondaryButton}`}>
-          Copy Text
-        </button>
+        <button className={`${styles.button} ${styles.secondaryButton}`}>Copy Text</button>
         <button
           className={`${styles.button} ${styles.secondaryButton}`}
-          onClick={() => setTranscript('')} // <-- Wire up the Clear button
+          onClick={() => setTranscript('')}
         >
           Clear Text
         </button>

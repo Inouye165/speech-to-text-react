@@ -1,23 +1,19 @@
 // src/hooks/useSpeechRecognition.ts
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 
-// --- TYPE DEFINITIONS for Web Speech API ---
-// This ensures TypeScript knows about the API's properties and events.
+// (TypeScript interfaces remain the same)
 interface SpeechRecognitionResult {
   isFinal: boolean;
   [key: number]: {
     transcript: string;
   };
 }
-
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResult[];
 }
-
 interface SpeechRecognitionErrorEvent {
     error: string;
 }
-
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
   interimResults: boolean;
@@ -28,26 +24,24 @@ interface SpeechRecognition extends EventTarget {
   onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => any) | null;
   onend: ((this: SpeechRecognition, ev: Event) => any) | null;
 }
-
 const SpeechRecognition =
   (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
-// --- THE HOOK ---
 const useSpeechRecognition = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [error, setError] = useState<string | null>(null); // <-- NEW: Error state
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  useEffect(() => {
-    if (!SpeechRecognition) return;
+  const startListening = () => {
+    if (isListening || !SpeechRecognition) return;
 
+    setError(null); // <-- NEW: Clear previous errors
     const recognition = new (SpeechRecognition as any)();
     recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
-    // --- IMPROVED LOGIC ---
-    // This now handles both interim and final results for a real-time experience.
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const currentTranscript = Array.from(event.results)
         .map((result) => result[0])
@@ -56,26 +50,33 @@ const useSpeechRecognition = () => {
       setTranscript(currentTranscript);
     };
 
-    // Add explicit types to fix the TypeScript errors
+    // --- NEW: Expanded Error Handling ---
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
+      switch (event.error) {
+        case 'not-allowed':
+          setError('Microphone permission denied. Please allow access in your browser settings.');
+          break;
+        case 'no-speech':
+          setError('No speech was detected. Please try again.');
+          break;
+        case 'network':
+          setError('A network error occurred. Please check your connection.');
+          break;
+        default:
+          setError('An unknown error occurred.');
+          break;
+      }
     };
     
     recognition.onend = () => setIsListening(false);
     recognitionRef.current = recognition;
-  }, []);
-
-  const startListening = () => {
-    if (recognitionRef.current) {
-      setTranscript('');
-      setIsListening(true);
-      recognitionRef.current.start();
-    }
+    setTranscript('');
+    setIsListening(true);
+    recognition.start();
   };
 
   const stopListening = () => {
     if (recognitionRef.current) {
-      setIsListening(false);
       recognitionRef.current.stop();
     }
   };
@@ -84,6 +85,7 @@ const useSpeechRecognition = () => {
     isListening,
     transcript,
     setTranscript,
+    error, // <-- NEW: Expose error state
     startListening,
     stopListening,
     hasRecognitionSupport: !!SpeechRecognition,

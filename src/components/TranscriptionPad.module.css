@@ -60,3 +60,12 @@
 .secondaryButton:hover {
   background-color: #757575;
 }
+
+/* Add this to the bottom of the file */
+.error {
+  font-size: 1rem;
+  color: #ff5252; /* A reddish error color */
+  min-height: 1.5rem;
+  text-align: center;
+  font-weight: bold;
+}

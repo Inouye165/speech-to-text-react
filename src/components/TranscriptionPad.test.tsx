@@ -94,4 +94,22 @@ describe('TranscriptionPad Component', () => {
     // Assert: Check that the hook's setter was called with an empty string
     expect(mockSetTranscript).toHaveBeenCalledWith('');
   });
+  it('should display an error message when the hook provides an error', () => {
+    // Arrange: Mock the hook to return an error message
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: '',
+      error: 'This is a test error.', // Provide a test error
+      setTranscript: vi.fn(),
+      startListening: vi.fn(),
+      stopListening: vi.fn(),
+      hasRecognitionSupport: true,
+    });
+
+    // Act
+    render(<TranscriptionPad />);
+
+    // Assert
+    expect(screen.getByText('This is a test error.')).toBeInTheDocument();
+});
 });
