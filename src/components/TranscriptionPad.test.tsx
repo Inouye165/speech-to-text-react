@@ -112,4 +112,105 @@ describe('TranscriptionPad Component', () => {
     // Assert
     expect(screen.getByText('This is a test error.')).toBeInTheDocument();
 });
+
+  it('disables Copy Text button when transcript is empty or whitespace', () => {
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: '   ',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
+
+    render(<TranscriptionPad />);
+    const copyButton = screen.getByRole('button', { name: /copy text/i });
+    expect(copyButton).toBeDisabled();
+  });
+
+  it('copies via navigator.clipboard when available and secure, then shows success', async () => {
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: 'Hello world',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
+
+    // Mock secure context and clipboard API
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty((global as any).window, 'isSecureContext', {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty((global as any).navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+
+    render(<TranscriptionPad />);
+    const copyButton = screen.getByRole('button', { name: /copy text/i });
+    fireEvent.click(copyButton);
+
+    expect(writeText).toHaveBeenCalledWith('Hello world');
+    expect(await screen.findByText('Copied to clipboard')).toBeInTheDocument();
+  });
+
+  it('falls back to document.execCommand(copy) when clipboard API not available', () => {
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: 'Fallback copy',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
+
+    // Remove clipboard and mark as insecure to force fallback path
+    Object.defineProperty((global as any).window, 'isSecureContext', {
+      value: false,
+      configurable: true,
+    });
+    Object.defineProperty((global as any).navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    });
+    (document as any).execCommand = vi.fn(() => true);
+
+    render(<TranscriptionPad />);
+    const copyButton = screen.getByRole('button', { name: /copy text/i });
+    fireEvent.click(copyButton);
+
+    expect((document as any).execCommand).toHaveBeenCalledWith('copy');
+    expect(screen.getByText('Copied to clipboard')).toBeInTheDocument();
+  });
+
+  it('shows failure status when copy throws', async () => {
+    (useSpeechRecognition as any).mockReturnValue({
+      isListening: false,
+      transcript: 'Will fail',
+      setTranscript: mockSetTranscript,
+      startListening: mockStartListening,
+      stopListening: mockStopListening,
+      hasRecognitionSupport: true,
+    });
+
+    Object.defineProperty((global as any).window, 'isSecureContext', {
+      value: true,
+      configurable: true,
+    });
+    Object.defineProperty((global as any).navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('nope')) },
+      configurable: true,
+    });
+    // Also make execCommand fail to ensure failure path
+    (document as any).execCommand = vi.fn(() => false);
+
+    render(<TranscriptionPad />);
+    const copyButton = screen.getByRole('button', { name: /copy text/i });
+    fireEvent.click(copyButton);
+
+    expect(await screen.findByText('Copy failed')).toBeInTheDocument();
+  });
 });
