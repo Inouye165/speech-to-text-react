@@ -10,6 +10,7 @@ interface SpeechRecognitionResult {
 }
 interface SpeechRecognitionEvent {
   results: SpeechRecognitionResult[];
+  resultIndex: number;
 }
 interface SpeechRecognitionErrorEvent {
     error: string;
@@ -32,6 +33,7 @@ const useSpeechRecognition = () => {
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null); // <-- NEW: Error state
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const finalizedTranscriptRef = useRef<string>('');
 
   const startListening = () => {
     if (isListening || !SpeechRecognition) return;
@@ -43,11 +45,18 @@ const useSpeechRecognition = () => {
     recognition.lang = 'en-US';
 
     recognition.onresult = (event: SpeechRecognitionEvent) => {
-      const currentTranscript = Array.from(event.results)
-        .map((result) => result[0])
-        .map((result) => result.transcript)
-        .join('');
-      setTranscript(currentTranscript);
+      // Build transcript incrementally from resultIndex
+      let interimText = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const result = event.results[i];
+        const textSegment = result[0].transcript;
+        if ((result as any).isFinal) {
+          finalizedTranscriptRef.current += textSegment;
+        } else {
+          interimText += textSegment;
+        }
+      }
+      setTranscript(finalizedTranscriptRef.current + interimText);
     };
 
     // --- NEW: Expanded Error Handling ---
@@ -70,6 +79,7 @@ const useSpeechRecognition = () => {
     
     recognition.onend = () => setIsListening(false);
     recognitionRef.current = recognition;
+    finalizedTranscriptRef.current = '';
     setTranscript('');
     setIsListening(true);
     recognition.start();
@@ -81,6 +91,11 @@ const useSpeechRecognition = () => {
     }
   };
 
+  const clearTranscript = () => {
+    finalizedTranscriptRef.current = '';
+    setTranscript('');
+  };
+
   return {
     isListening,
     transcript,
@@ -89,6 +104,7 @@ const useSpeechRecognition = () => {
     startListening,
     stopListening,
     hasRecognitionSupport: !!SpeechRecognition,
+    clearTranscript,
   };
 };
 

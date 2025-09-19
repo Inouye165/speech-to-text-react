@@ -75,12 +75,14 @@ describe('TranscriptionPad Component', () => {
     expect(mockStartListening).toHaveBeenCalledOnce();
   });
 
-  it('should call the setTranscript function when the clear button is clicked', () => {
+  it('should call the clearTranscript function when the clear button is clicked', () => {
     // Arrange
+    const mockClear = vi.fn();
     (useSpeechRecognition as any).mockReturnValue({
       isListening: false,
       transcript: 'Some text',
       setTranscript: mockSetTranscript,
+      clearTranscript: mockClear,
       startListening: mockStartListening,
       stopListening: mockStopListening,
       hasRecognitionSupport: true,
@@ -91,8 +93,8 @@ describe('TranscriptionPad Component', () => {
     // Act: Click the button
     fireEvent.click(clearButton);
 
-    // Assert: Check that the hook's setter was called with an empty string
-    expect(mockSetTranscript).toHaveBeenCalledWith('');
+    // Assert: clearTranscript should be called
+    expect(mockClear).toHaveBeenCalled();
   });
   it('should display an error message when the hook provides an error', () => {
     // Arrange: Mock the hook to return an error message

@@ -14,6 +14,7 @@ export function TranscriptionPad() {
     startListening,
     stopListening,
     hasRecognitionSupport,
+    clearTranscript,
   } = useSpeechRecognition();
 
   const showCopyStatus = (message: string) => {
@@ -94,7 +95,7 @@ export function TranscriptionPad() {
         </button>
         <button
           className={`${styles.button} ${styles.secondaryButton}`}
-          onClick={() => setTranscript('')}
+          onClick={() => clearTranscript()}
         >
           Clear Text
         </button>
