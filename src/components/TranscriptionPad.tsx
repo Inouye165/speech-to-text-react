@@ -1,9 +1,13 @@
 // src/components/TranscriptionPad.tsx
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import styles from './TranscriptionPad.module.css';
 import useSpeechRecognition from '../hooks/useSpeechRecognition';
 
-export function TranscriptionPad() {
+type TranscriptionPadProps = {
+  onTranscriptChange?: (text: string) => void;
+};
+
+export function TranscriptionPad({ onTranscriptChange }: TranscriptionPadProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [copyStatus, setCopyStatus] = useState<string>('');
   const {
@@ -16,6 +20,12 @@ export function TranscriptionPad() {
     hasRecognitionSupport,
     clearTranscript,
   } = useSpeechRecognition();
+
+  useEffect(() => {
+    if (onTranscriptChange) {
+      onTranscriptChange(transcript);
+    }
+  }, [transcript, onTranscriptChange]);
 
   const showCopyStatus = (message: string) => {
     setCopyStatus(message);

@@ -1,6 +1,7 @@
 // src/App.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { TranscriptionPad } from './components/TranscriptionPad';
+import GroceryPane from './components/GroceryPane';
 
 const appStyles: React.CSSProperties = {
   display: 'flex',
@@ -11,9 +12,13 @@ const appStyles: React.CSSProperties = {
 };
 
 function App() {
+  const [transcript, setTranscript] = useState('');
   return (
     <div style={appStyles}>
-      <TranscriptionPad />
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', width: '95%', maxWidth: 1200 }}>
+        <TranscriptionPad onTranscriptChange={setTranscript} />
+        <GroceryPane transcript={transcript} />
+      </div>
     </div>
   );
 }
