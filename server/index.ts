@@ -4,6 +4,7 @@ import cors from 'cors';
 import { z } from 'zod';
 import { ChatOpenAI } from '@langchain/openai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import * as cheerio from 'cheerio';
 
 const app = express();
 app.use(cors());
@@ -44,6 +45,145 @@ Rules:
 - Remove common pantry items that people usually have (salt, pepper, water, etc.)
 - Output ONLY in the specified JSON schema.
 `;
+
+// Function to fetch and extract recipe content from URL
+async function fetchRecipeFromUrl(url: string): Promise<string> {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+    }
+
+    const html = await response.text();
+    const $ = cheerio.load(html);
+
+    let recipeText = '';
+
+    // First, try to find structured data (JSON-LD) - most reliable
+    $('script[type="application/ld+json"]').each((_, script) => {
+      try {
+        const scriptContent = $(script).html();
+        if (!scriptContent) return;
+        
+        const data = JSON.parse(scriptContent);
+        const recipes = Array.isArray(data) ? data : [data];
+        
+        for (const item of recipes) {
+          if (item['@type'] === 'Recipe' && item.recipeIngredient) {
+            recipeText = Array.isArray(item.recipeIngredient) 
+              ? item.recipeIngredient.join('\n')
+              : item.recipeIngredient;
+            if (recipeText.length > 50) return false; // Break out of each loop
+          }
+        }
+      } catch (e) {
+        // Ignore JSON parsing errors
+      }
+    });
+
+    // If no structured data, try common recipe selectors
+    if (!recipeText || recipeText.length < 50) {
+      const recipeSelectors = [
+        // Schema.org microdata
+        '[itemtype*="Recipe"] [itemprop="recipeIngredient"]',
+        '[itemtype*="Recipe"] .ingredient',
+        
+        // Common recipe site selectors
+        '.recipe-ingredients',
+        '.recipe-ingredients-list',
+        '.ingredients',
+        '.ingredient-list',
+        '.recipe-ingredient',
+        '.wprm-recipe-ingredients',
+        '.tasty-recipes-ingredients',
+        '.recipe-card-ingredients',
+        '.recipe-ingredients-container',
+        '.ingredients-container',
+        
+        // Generic selectors
+        '.recipe [class*="ingredient"]',
+        '.recipe [class*="ingredients"]',
+        '[data-testid*="ingredient"]',
+        '[data-testid*="recipe"] [class*="ingredient"]',
+        
+        // List-based selectors
+        '.recipe ul li',
+        '.recipe ol li',
+        '.ingredients ul li',
+        '.ingredients ol li'
+      ];
+
+      for (const selector of recipeSelectors) {
+        const elements = $(selector);
+        if (elements.length > 0) {
+          const text = elements.map((_, el) => $(el).text().trim()).get().join('\n');
+          if (text.length > 100) {
+            recipeText = text;
+            break;
+          }
+        }
+      }
+    }
+
+    // Fallback: look for any text that looks like ingredients
+    if (!recipeText || recipeText.length < 50) {
+      const ingredientKeywords = ['cup', 'tbsp', 'tsp', 'tablespoon', 'teaspoon', 'pound', 'lb', 'ounce', 'oz', 'gram', 'g', 'ml', 'liter'];
+      
+      const potentialIngredients = $('li, p, div, span').filter((_, el) => {
+        const text = $(el).text().toLowerCase().trim();
+        return text.length > 10 && text.length < 200 && 
+               ingredientKeywords.some(keyword => text.includes(keyword)) &&
+               !text.includes('preheat') && 
+               !text.includes('bake') && 
+               !text.includes('cook') &&
+               !text.includes('method') &&
+               !text.includes('instruction');
+      });
+      
+      if (potentialIngredients.length > 0) {
+        recipeText = potentialIngredients.map((_, el) => $(el).text().trim()).get().join('\n');
+      }
+    }
+
+    // Final fallback: extract from the entire page content if it looks like a recipe
+    if (!recipeText || recipeText.length < 50) {
+      const pageText = $('body').text();
+      const recipeKeywords = ['ingredients', 'recipe', 'cooking', 'baking', 'preparation'];
+      const hasRecipeKeywords = recipeKeywords.some(keyword => pageText.toLowerCase().includes(keyword));
+      
+      if (hasRecipeKeywords) {
+        // Try to extract lines that look like ingredients
+        const lines = pageText.split('\n').filter(line => {
+          const trimmed = line.trim();
+          return trimmed.length > 10 && trimmed.length < 200 &&
+                 /[\d\/\s]+(cup|tbsp|tsp|tablespoon|teaspoon|pound|lb|ounce|oz|gram|g|ml|liter)/i.test(trimmed);
+        });
+        
+        if (lines.length > 0) {
+          recipeText = lines.join('\n');
+        }
+      }
+    }
+
+    if (!recipeText || recipeText.length < 30) {
+      throw new Error(`Could not extract recipe content from URL. Page may not contain a recipe or uses an unsupported format.`);
+    }
+
+    return recipeText;
+  } catch (error) {
+    throw new Error(`Failed to fetch recipe from URL: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+}
 
 app.post('/api/grocery', async (req, res) => {
   try {
@@ -140,6 +280,74 @@ Task: Extract all ingredients from this recipe and normalize them for a grocery 
   }
 });
 
+// Parse recipe from URL and add ingredients to grocery list
+app.post('/api/recipe-url', async (req, res) => {
+  try {
+    const { url } = req.body as { url: string };
+
+    if (!url) {
+      return res.status(400).json({ error: 'URL is required' });
+    }
+
+    if (!process.env.OPENAI_API_KEY) {
+      return res.status(400).json({ error: 'Missing OPENAI_API_KEY' });
+    }
+
+    // Validate URL format
+    try {
+      new URL(url);
+    } catch {
+      return res.status(400).json({ error: 'Invalid URL format' });
+    }
+
+    // Fetch recipe content from URL
+    const recipeText = await fetchRecipeFromUrl(url);
+
+    const llm = new ChatOpenAI({
+      model: 'gpt-4o-mini',
+      temperature: 0.2,
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+    const structuredModel = llm.withStructuredOutput(RecipeIngredientSchema, { name: 'recipe_ingredients' });
+
+    const userPrompt = `
+Recipe content from URL (${url}):
+"""
+${recipeText}
+"""
+
+Task: Extract all ingredients from this recipe content and normalize them for a grocery list. Remove measurements, quantities, and preparation notes. Return only the ingredient names.
+`;
+
+    const result = await structuredModel.invoke([
+      new SystemMessage(RECIPE_SYSTEM),
+      new HumanMessage(userPrompt),
+    ]);
+
+    // Add new ingredients to the current list (avoiding duplicates)
+    const newIngredients = result.ingredients.filter(ingredient => 
+      !currentGroceryList.some(existing => 
+        existing.toLowerCase().includes(ingredient.toLowerCase()) ||
+        ingredient.toLowerCase().includes(existing.toLowerCase())
+      )
+    );
+    
+    currentGroceryList = [...currentGroceryList, ...newIngredients];
+
+    return res.json({ 
+      ingredients: result.ingredients, 
+      added: newIngredients,
+      reasoning: result.reasoning,
+      currentList: currentGroceryList,
+      sourceUrl: url,
+      extractedContent: recipeText.substring(0, 500) + (recipeText.length > 500 ? '...' : '') // Preview of extracted content
+    });
+  } catch (err: any) {
+    console.error(err);
+    return res.status(500).json({ error: `Failed to parse recipe from URL: ${err.message}` });
+  }
+});
+
 // Get current grocery list
 app.get('/api/grocery', (req, res) => {
   return res.json({ items: currentGroceryList });
@@ -151,7 +359,17 @@ app.delete('/api/grocery', (req, res) => {
   return res.json({ items: [], message: 'Grocery list cleared' });
 });
 
-const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
-app.listen(PORT, () => console.log(`Grocery API running on http://localhost:${PORT}`));
+// Export for testing
+export { app, currentGroceryList };
+
+// Helper functions for testing
+export const getCurrentGroceryList = () => currentGroceryList;
+export const clearGroceryList = () => { currentGroceryList = []; };
+
+// Only start the server if not in test environment
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
+  app.listen(PORT, () => console.log(`Grocery API running on http://localhost:${PORT}`));
+}
 
 

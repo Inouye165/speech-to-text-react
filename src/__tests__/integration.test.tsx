@@ -186,4 +186,44 @@ describe('App Integration Tests', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
+
+  it('should handle URL recipe parsing workflow', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        ingredients: ['chicken', 'broccoli', 'cheese'],
+        added: ['chicken', 'broccoli', 'cheese'],
+        reasoning: 'Extracted ingredients from recipe URL',
+        currentList: ['chicken', 'broccoli', 'cheese'],
+        sourceUrl: 'https://example.com/recipe'
+      }),
+    });
+
+    render(<App />);
+
+    // Click "URL" button
+    fireEvent.click(screen.getByText('URL'));
+
+    // Type URL into input
+    const urlInput = screen.getByPlaceholderText(/Paste recipe URL here/);
+    fireEvent.change(urlInput, { target: { value: 'https://example.com/recipe' } });
+
+    // Click "Add from URL"
+    fireEvent.click(screen.getByText('Add from URL'));
+
+    await waitFor(() => {
+      expect(screen.getByText('chicken')).toBeInTheDocument();
+      expect(screen.getByText('broccoli')).toBeInTheDocument();
+      expect(screen.getByText('cheese')).toBeInTheDocument();
+      expect(screen.getByText(/Added 3 ingredients from recipe URL/)).toBeInTheDocument();
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/recipe-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: 'https://example.com/recipe'
+      }),
+    });
+  });
 });

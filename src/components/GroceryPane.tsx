@@ -9,6 +9,8 @@ export default function GroceryPane({ transcript }: Props) {
   const [reasoning, setReasoning] = useState('');
   const [recipeText, setRecipeText] = useState('');
   const [showRecipeInput, setShowRecipeInput] = useState(false);
+  const [recipeUrl, setRecipeUrl] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   const processTranscript = async () => {
     try {
@@ -67,6 +69,32 @@ export default function GroceryPane({ transcript }: Props) {
     }
   };
 
+  const processRecipeUrl = async () => {
+    if (!recipeUrl.trim()) return;
+    
+    try {
+      setStatus('loading');
+      const resp = await fetch('http://localhost:8787/api/recipe-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: recipeUrl }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || 'API error');
+      
+      setItems(data.currentList || []);
+      setReasoning(`Added ${data.added?.length || 0} ingredients from recipe URL: ${data.added?.join(', ') || 'none'}. ${data.reasoning || ''}`);
+      setRecipeUrl('');
+      setShowUrlInput(false);
+      setStatus('idle');
+    } catch (e) {
+      setStatus('error');
+      // Show more specific error message
+      const errorMessage = e instanceof Error ? e.message : 'Failed to process recipe URL';
+      setReasoning(`Error: ${errorMessage}. Please try a different recipe URL or paste the recipe text directly.`);
+    }
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
       <h3 style={{ color: '#e0e0e0', margin: 0 }}>Grocery List</h3>
@@ -110,6 +138,20 @@ export default function GroceryPane({ transcript }: Props) {
           }}
         >
           Recipe
+        </button>
+        <button
+          onClick={() => setShowUrlInput(!showUrlInput)}
+          disabled={status === 'loading'}
+          style={{ 
+            padding: '0.5rem 1rem', 
+            background: '#9C27B0', 
+            color: 'white', 
+            border: 'none', 
+            borderRadius: 4, 
+            cursor: status === 'loading' ? 'not-allowed' : 'pointer'
+          }}
+        >
+          URL
         </button>
         <button
           onClick={clearList}
@@ -181,6 +223,61 @@ export default function GroceryPane({ transcript }: Props) {
           </div>
         </div>
       )}
+      
+      {showUrlInput && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+          <input
+            type="url"
+            value={recipeUrl}
+            onChange={(e) => setRecipeUrl(e.target.value)}
+            placeholder="Paste recipe URL here (e.g., https://allrecipes.com/recipe/...)"
+            style={{
+              width: '100%',
+              padding: '0.5rem',
+              background: '#1a1a1a',
+              border: '1px solid #424242',
+              borderRadius: 4,
+              color: '#e0e0e0',
+              fontSize: '0.9rem'
+            }}
+          />
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={processRecipeUrl}
+              disabled={!recipeUrl.trim() || status === 'loading'}
+              style={{ 
+                padding: '0.5rem 1rem', 
+                background: '#9C27B0', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: 4, 
+                cursor: !recipeUrl.trim() || status === 'loading' ? 'not-allowed' : 'pointer',
+                flex: 1
+              }}
+            >
+              {status === 'loading' ? 'Fetching...' : 'Add from URL'}
+            </button>
+            <button
+              onClick={() => {
+                setShowUrlInput(false);
+                setRecipeUrl('');
+              }}
+              disabled={status === 'loading'}
+              style={{ 
+                padding: '0.5rem 1rem', 
+                background: '#616161', 
+                color: 'white', 
+                border: 'none', 
+                borderRadius: 4, 
+                cursor: status === 'loading' ? 'not-allowed' : 'pointer'
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+      
       {status === 'error' && (
         <p style={{ color: '#ff5252', margin: 0 }}>Failed to process instructions.</p>
       )}

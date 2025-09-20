@@ -207,4 +207,92 @@ describe('GroceryPane', () => {
       expect(screen.getByText('Update List')).toBeInTheDocument();
     });
   });
+
+  it('should show URL input when URL button is clicked', () => {
+    render(<GroceryPane transcript="test" />);
+    
+    const urlButton = screen.getByText('URL');
+    fireEvent.click(urlButton);
+
+    expect(screen.getByPlaceholderText(/Paste recipe URL here/)).toBeInTheDocument();
+    expect(screen.getByText('Add from URL')).toBeInTheDocument();
+    expect(screen.getByText('Cancel')).toBeInTheDocument();
+  });
+
+  it('should process recipe URL and add ingredients', async () => {
+    const mockResponse = {
+      ingredients: ['chicken', 'broccoli', 'cheese'],
+      added: ['chicken', 'broccoli', 'cheese'],
+      reasoning: 'Extracted ingredients from recipe URL',
+      currentList: ['chicken', 'broccoli', 'cheese'],
+      sourceUrl: 'https://example.com/recipe'
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    render(<GroceryPane transcript="test" />);
+    
+    // Click URL button
+    const urlButton = screen.getByText('URL');
+    fireEvent.click(urlButton);
+
+    // Enter URL
+    const urlInput = screen.getByPlaceholderText(/Paste recipe URL here/);
+    fireEvent.change(urlInput, {
+      target: { value: 'https://example.com/recipe' }
+    });
+
+    // Click add from URL
+    const addFromUrlButton = screen.getByText('Add from URL');
+    fireEvent.click(addFromUrlButton);
+
+    // Wait for the API call and UI update
+    await waitFor(() => {
+      expect(screen.getByText('chicken')).toBeInTheDocument();
+      expect(screen.getByText('broccoli')).toBeInTheDocument();
+      expect(screen.getByText('cheese')).toBeInTheDocument();
+    });
+
+    expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/recipe-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: 'https://example.com/recipe'
+      }),
+    });
+  });
+
+  it('should cancel URL input', () => {
+    render(<GroceryPane transcript="test" />);
+    
+    // Click URL button
+    const urlButton = screen.getByText('URL');
+    fireEvent.click(urlButton);
+
+    // Enter some URL
+    const urlInput = screen.getByPlaceholderText(/Paste recipe URL here/);
+    fireEvent.change(urlInput, {
+      target: { value: 'https://example.com/recipe' }
+    });
+
+    // Cancel
+    const cancelButton = screen.getByText('Cancel');
+    fireEvent.click(cancelButton);
+
+    expect(screen.queryByPlaceholderText(/Paste recipe URL here/)).not.toBeInTheDocument();
+  });
+
+  it('should disable add from URL button when no URL', () => {
+    render(<GroceryPane transcript="test" />);
+    
+    // Click URL button
+    const urlButton = screen.getByText('URL');
+    fireEvent.click(urlButton);
+
+    const addFromUrlButton = screen.getByText('Add from URL');
+    expect(addFromUrlButton).toBeDisabled();
+  });
 });

@@ -18,6 +18,8 @@
   "dependencies": {
     "@langchain/core": "^0.3.77",
     "@langchain/openai": "^0.6.13",
+    "@types/cheerio": "^0.22.35",
+    "cheerio": "^1.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
