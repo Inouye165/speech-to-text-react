@@ -31,14 +31,17 @@ const SpeechRecognition =
 const useSpeechRecognition = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [error, setError] = useState<string | null>(null); // <-- NEW: Error state
+  const [error, setError] = useState<string | null>(null);
+  const [autoRestart, setAutoRestart] = useState(true); // <-- NEW: Auto-restart control
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalizedTranscriptRef = useRef<string>('');
+  const shouldRestartRef = useRef<boolean>(false); // <-- NEW: Track restart intent
 
   const startListening = () => {
     if (isListening || !SpeechRecognition) return;
 
-    setError(null); // <-- NEW: Clear previous errors
+    setError(null);
+    shouldRestartRef.current = true; // <-- NEW: Mark that we want to keep recording
     const recognition = new (SpeechRecognition as any)();
     recognition.continuous = true;
     recognition.interimResults = true;
@@ -59,17 +62,30 @@ const useSpeechRecognition = () => {
       setTranscript(finalizedTranscriptRef.current + interimText);
     };
 
-    // --- NEW: Expanded Error Handling ---
+    // --- Enhanced Error Handling with Auto-Restart ---
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       switch (event.error) {
         case 'not-allowed':
           setError('Microphone permission denied. Please allow access in your browser settings.');
+          shouldRestartRef.current = false; // Don't restart for permission errors
           break;
         case 'no-speech':
-          setError('No speech was detected. Please try again.');
+          // Auto-restart for no speech detected (common and recoverable)
+          if (autoRestart && shouldRestartRef.current) {
+            setTimeout(() => {
+              if (shouldRestartRef.current) startListening();
+            }, 1000);
+          } else {
+            setError('No speech was detected. Please try again.');
+          }
           break;
         case 'network':
           setError('A network error occurred. Please check your connection.');
+          // Don't auto-restart for network errors
+          break;
+        case 'aborted':
+          // User or system aborted - don't restart
+          shouldRestartRef.current = false;
           break;
         default:
           setError('An unknown error occurred.');
@@ -77,7 +93,18 @@ const useSpeechRecognition = () => {
       }
     };
     
-    recognition.onend = () => setIsListening(false);
+    // --- NEW: Auto-restart on end ---
+    recognition.onend = () => {
+      setIsListening(false);
+      // Auto-restart if we were supposed to be listening and auto-restart is enabled
+      if (autoRestart && shouldRestartRef.current) {
+        setTimeout(() => {
+          if (shouldRestartRef.current) {
+            startListening();
+          }
+        }, 100); // Small delay to prevent rapid restart loops
+      }
+    };
     recognitionRef.current = recognition;
     finalizedTranscriptRef.current = '';
     setTranscript('');
@@ -86,6 +113,7 @@ const useSpeechRecognition = () => {
   };
 
   const stopListening = () => {
+    shouldRestartRef.current = false; // <-- NEW: Stop auto-restart when user stops
     if (recognitionRef.current) {
       recognitionRef.current.stop();
     }
@@ -100,7 +128,9 @@ const useSpeechRecognition = () => {
     isListening,
     transcript,
     setTranscript,
-    error, // <-- NEW: Expose error state
+    error,
+    autoRestart, // <-- NEW: Expose auto-restart control
+    setAutoRestart, // <-- NEW: Allow toggling auto-restart
     startListening,
     stopListening,
     hasRecognitionSupport: !!SpeechRecognition,

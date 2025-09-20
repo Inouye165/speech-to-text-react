@@ -14,7 +14,9 @@ export function TranscriptionPad({ onTranscriptChange }: TranscriptionPadProps) 
     isListening,
     transcript,
     setTranscript,
-    error, // <-- NEW: Get the error message
+    error,
+    autoRestart, // <-- NEW: Get auto-restart state
+    setAutoRestart, // <-- NEW: Get auto-restart control
     startListening,
     stopListening,
     hasRecognitionSupport,
@@ -109,6 +111,21 @@ export function TranscriptionPad({ onTranscriptChange }: TranscriptionPadProps) 
         >
           Clear Text
         </button>
+      </div>
+      
+      {/* NEW: Auto-restart toggle */}
+      <div className={styles.autoRestartControl}>
+        <label className={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={autoRestart}
+            onChange={(e) => setAutoRestart(e.target.checked)}
+            className={styles.checkbox}
+          />
+          <span className={styles.checkboxText}>
+            Auto-restart recording when it stops
+          </span>
+        </label>
       </div>
       {copyStatus && <p className={styles.status}>{copyStatus}</p>}
     </div>

@@ -61,11 +61,37 @@
   background-color: #757575;
 }
 
-/* Add this to the bottom of the file */
 .error {
   font-size: 1rem;
   color: #ff5252; /* A reddish error color */
   min-height: 1.5rem;
   text-align: center;
   font-weight: bold;
+}
+
+/* NEW: Auto-restart control styles */
+.autoRestartControl {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.checkboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  color: #e0e0e0;
+  font-size: 0.9rem;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: #4CAF50;
+  cursor: pointer;
+}
+
+.checkboxText {
+  user-select: none;
 }
