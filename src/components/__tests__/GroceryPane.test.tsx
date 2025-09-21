@@ -12,63 +12,80 @@ const mockFetch = fetch as any;
 describe('GroceryPane', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    
+    // Mock successful initial load
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ items: [] }),
+    });
   });
 
-  it('should render with empty grocery list', () => {
+  it('should render with empty grocery list', async () => {
     render(<GroceryPane transcript="test transcript" />);
     
     expect(screen.getByText('Grocery List')).toBeInTheDocument();
-    expect(screen.getByText(/No items yet/)).toBeInTheDocument();
+    
+    await waitFor(() => {
+      expect(screen.getByText(/No items yet/)).toBeInTheDocument();
+    });
   });
 
-  it('should show update button when transcript is provided', () => {
+  it('should show update button when transcript is provided', async () => {
     render(<GroceryPane transcript="add milk" />);
-    
-    expect(screen.getByText('Update List')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText('Update List')).toBeInTheDocument();
+      expect(screen.getByText('Update List')).not.toBeDisabled();
+    });
   });
 
-  it('should disable update button when no transcript', () => {
+  it('should disable update button when no transcript', async () => {
     render(<GroceryPane transcript="" />);
-    
-    const updateButton = screen.getByText('Update List');
-    expect(updateButton).toBeDisabled();
+
+    await waitFor(() => {
+      expect(screen.getByText('Update List')).toBeDisabled();
+    });
   });
 
   it('should process transcript and update grocery list', async () => {
-    const mockResponse = {
-      items: ['milk', 'bread'],
-      reasoning: 'Added milk and bread to the list'
-    };
-
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => mockResponse,
-    } as Response);
+      json: () => Promise.resolve({ items: ['milk', 'bread'], reasoning: 'Added milk and bread.' }),
+    });
 
     render(<GroceryPane transcript="add milk and bread" />);
     
-    const updateButton = screen.getByText('Update List');
-    fireEvent.click(updateButton);
-
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/grocery', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript: 'add milk and bread' }),
+    await waitFor(() => {
+      expect(screen.getByText('Update List')).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByText('Update List'));
+
     await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/grocery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ transcript: 'add milk and bread' }),
+      });
       expect(screen.getByText('milk')).toBeInTheDocument();
       expect(screen.getByText('bread')).toBeInTheDocument();
+      expect(screen.getByText('Added milk and bread.')).toBeInTheDocument();
     });
   });
 
   it('should show error when API call fails', async () => {
-    mockFetch.mockRejectedValueOnce(new Error('API Error'));
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () => Promise.resolve({ error: 'API error' }),
+    });
 
     render(<GroceryPane transcript="add milk" />);
     
-    const updateButton = screen.getByText('Update List');
-    fireEvent.click(updateButton);
+    await waitFor(() => {
+      expect(screen.getByText('Update List')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Update List'));
 
     await waitFor(() => {
       expect(screen.getByText('Failed to process instructions.')).toBeInTheDocument();
@@ -76,110 +93,102 @@ describe('GroceryPane', () => {
   });
 
   it('should clear grocery list when clear button is clicked', async () => {
-    const mockResponse = {
-      items: [],
-      message: 'Grocery list cleared'
-    };
-
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => mockResponse,
-    } as Response);
+      json: () => Promise.resolve({ items: ['milk'] }),
+    });
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ items: [], message: 'Grocery list cleared' }),
+    });
 
     render(<GroceryPane transcript="add milk" />);
     
-    const clearButton = screen.getByText('Clear');
-    fireEvent.click(clearButton);
-
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/grocery', {
-      method: 'DELETE',
+    await waitFor(() => {
+      expect(screen.getByText('Update List')).toBeInTheDocument();
     });
 
+    fireEvent.click(screen.getByText('Update List'));
+    await waitFor(() => expect(screen.getByText('milk')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByText('Clear'));
+
     await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/grocery', {
+        method: 'DELETE',
+      });
       expect(screen.getByText(/No items yet/)).toBeInTheDocument();
     });
   });
 
-  it('should show recipe input when recipe button is clicked', () => {
+  it('should show recipe input when recipe button is clicked', async () => {
     render(<GroceryPane transcript="test" />);
     
-    const recipeButton = screen.getByText('Recipe');
-    fireEvent.click(recipeButton);
+    await waitFor(() => {
+      expect(screen.getByText('Recipe')).toBeInTheDocument();
+    });
 
+    fireEvent.click(screen.getByText('Recipe'));
     expect(screen.getByPlaceholderText('Paste your recipe here...')).toBeInTheDocument();
-    expect(screen.getByText('Add Ingredients')).toBeInTheDocument();
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
   });
 
   it('should process recipe and add ingredients', async () => {
-    const mockResponse = {
-      ingredients: ['flour', 'sugar', 'eggs'],
-      added: ['flour', 'sugar', 'eggs'],
-      reasoning: 'Extracted ingredients from recipe',
-      currentList: ['flour', 'sugar', 'eggs']
-    };
-
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => mockResponse,
-    } as Response);
-
-    render(<GroceryPane transcript="test" />);
-    
-    // Open recipe input
-    const recipeButton = screen.getByText('Recipe');
-    fireEvent.click(recipeButton);
-
-    // Enter recipe text
-    const recipeTextarea = screen.getByPlaceholderText('Paste your recipe here...');
-    fireEvent.change(recipeTextarea, { target: { value: 'Chocolate Chip Cookies\nIngredients:\n- 2 cups flour\n- 1 cup sugar\n- 2 eggs' } });
-
-    // Submit recipe
-    const addIngredientsButton = screen.getByText('Add Ingredients');
-    fireEvent.click(addIngredientsButton);
-
-    expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/recipe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        recipe: 'Chocolate Chip Cookies\nIngredients:\n- 2 cups flour\n- 1 cup sugar\n- 2 eggs' 
+      json: () => Promise.resolve({
+        ingredients: ['flour', 'sugar'],
+        added: ['flour', 'sugar'],
+        reasoning: 'Extracted flour and sugar.',
+        currentList: ['flour', 'sugar']
       }),
     });
 
+    render(<GroceryPane transcript="test" />);
+    
     await waitFor(() => {
+      expect(screen.getByText('Recipe')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Recipe'));
+    fireEvent.change(screen.getByPlaceholderText('Paste your recipe here...'), {
+      target: { value: '1 cup flour, 1/2 cup sugar' },
+    });
+    fireEvent.click(screen.getByText('Add Ingredients'));
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith('http://localhost:8787/api/recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipe: '1 cup flour, 1/2 cup sugar' }),
+      });
       expect(screen.getByText('flour')).toBeInTheDocument();
       expect(screen.getByText('sugar')).toBeInTheDocument();
-      expect(screen.getByText('eggs')).toBeInTheDocument();
+      expect(screen.getByText(/Added 2 ingredients from recipe/)).toBeInTheDocument();
     });
   });
 
-  it('should cancel recipe input', () => {
+  it('should cancel recipe input', async () => {
     render(<GroceryPane transcript="test" />);
     
-    // Open recipe input
-    const recipeButton = screen.getByText('Recipe');
-    fireEvent.click(recipeButton);
+    await waitFor(() => {
+      expect(screen.getByText('Recipe')).toBeInTheDocument();
+    });
 
-    // Enter some text
-    const recipeTextarea = screen.getByPlaceholderText('Paste your recipe here...');
-    fireEvent.change(recipeTextarea, { target: { value: 'test recipe' } });
-
-    // Cancel
-    const cancelButton = screen.getByText('Cancel');
-    fireEvent.click(cancelButton);
-
+    fireEvent.click(screen.getByText('Recipe'));
+    expect(screen.getByPlaceholderText('Paste your recipe here...')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Cancel'));
     expect(screen.queryByPlaceholderText('Paste your recipe here...')).not.toBeInTheDocument();
   });
 
-  it('should disable add ingredients button when no recipe text', () => {
+  it('should disable add ingredients button when no recipe text', async () => {
     render(<GroceryPane transcript="test" />);
     
-    // Open recipe input
-    const recipeButton = screen.getByText('Recipe');
-    fireEvent.click(recipeButton);
+    await waitFor(() => {
+      expect(screen.getByText('Recipe')).toBeInTheDocument();
+    });
 
-    const addIngredientsButton = screen.getByText('Add Ingredients');
-    expect(addIngredientsButton).toBeDisabled();
+    fireEvent.click(screen.getByText('Recipe'));
+    expect(screen.getByText('Add Ingredients')).toBeDisabled();
   });
 
   it('should show loading state during processing', async () => {
@@ -192,8 +201,11 @@ describe('GroceryPane', () => {
 
     render(<GroceryPane transcript="add milk" />);
     
-    const updateButton = screen.getByText('Update List');
-    fireEvent.click(updateButton);
+    await waitFor(() => {
+      expect(screen.getByText('Update List')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Update List'));
 
     expect(screen.getByText('Processing…')).toBeInTheDocument();
 
@@ -208,11 +220,14 @@ describe('GroceryPane', () => {
     });
   });
 
-  it('should show URL input when URL button is clicked', () => {
+  it('should show URL input when URL button is clicked', async () => {
     render(<GroceryPane transcript="test" />);
     
-    const urlButton = screen.getByText('URL');
-    fireEvent.click(urlButton);
+    await waitFor(() => {
+      expect(screen.getByText('URL')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('URL'));
 
     expect(screen.getByPlaceholderText(/Paste recipe URL here/)).toBeInTheDocument();
     expect(screen.getByText('Add from URL')).toBeInTheDocument();
@@ -235,6 +250,10 @@ describe('GroceryPane', () => {
 
     render(<GroceryPane transcript="test" />);
     
+    await waitFor(() => {
+      expect(screen.getByText('URL')).toBeInTheDocument();
+    });
+
     // Click URL button
     const urlButton = screen.getByText('URL');
     fireEvent.click(urlButton);
@@ -265,9 +284,13 @@ describe('GroceryPane', () => {
     });
   });
 
-  it('should cancel URL input', () => {
+  it('should cancel URL input', async () => {
     render(<GroceryPane transcript="test" />);
     
+    await waitFor(() => {
+      expect(screen.getByText('URL')).toBeInTheDocument();
+    });
+
     // Click URL button
     const urlButton = screen.getByText('URL');
     fireEvent.click(urlButton);
@@ -285,9 +308,13 @@ describe('GroceryPane', () => {
     expect(screen.queryByPlaceholderText(/Paste recipe URL here/)).not.toBeInTheDocument();
   });
 
-  it('should disable add from URL button when no URL', () => {
+  it('should disable add from URL button when no URL', async () => {
     render(<GroceryPane transcript="test" />);
     
+    await waitFor(() => {
+      expect(screen.getByText('URL')).toBeInTheDocument();
+    });
+
     // Click URL button
     const urlButton = screen.getByText('URL');
     fireEvent.click(urlButton);

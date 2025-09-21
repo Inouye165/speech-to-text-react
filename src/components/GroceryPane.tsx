@@ -1,5 +1,5 @@
 // src/components/GroceryPane.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 type Props = { transcript: string };
 
@@ -11,6 +11,26 @@ export default function GroceryPane({ transcript }: Props) {
   const [showRecipeInput, setShowRecipeInput] = useState(false);
   const [recipeUrl, setRecipeUrl] = useState('');
   const [showUrlInput, setShowUrlInput] = useState(false);
+
+  // Load existing grocery list on component mount
+  useEffect(() => {
+    const loadGroceryList = async () => {
+      try {
+        setStatus('loading');
+        const resp = await fetch('http://localhost:8787/api/grocery');
+        const data = await resp.json();
+        if (resp.ok) {
+          setItems(data.items || []);
+        }
+        setStatus('idle');
+      } catch (e) {
+        console.error('Failed to load grocery list:', e);
+        setStatus('error');
+      }
+    };
+
+    loadGroceryList();
+  }, []); // Empty dependency array means this runs once on mount
 
   const processTranscript = async () => {
     try {

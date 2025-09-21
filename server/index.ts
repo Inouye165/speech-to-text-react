@@ -5,13 +5,28 @@ import { z } from 'zod';
 import { ChatOpenAI } from '@langchain/openai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import * as cheerio from 'cheerio';
+import { getStorage } from './storage';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// In-memory store for grocery lists (in production, use a database)
+// Get storage instance (file-based for now, easily replaceable with database)
+const storage = getStorage();
+
+// Load grocery list from storage on startup
 let currentGroceryList: string[] = [];
+
+// Initialize storage and load existing data
+async function initializeStorage() {
+  try {
+    currentGroceryList = await storage.getList();
+    console.log(`Loaded ${currentGroceryList.length} items from storage`);
+  } catch (error) {
+    console.error('Failed to load grocery list from storage:', error);
+    currentGroceryList = [];
+  }
+}
 
 const GroceryPlanSchema = z.object({
   final_list: z.array(z.string()).describe('The final grocery list after applying all instructions.'),
@@ -218,8 +233,10 @@ Return JSON only.
       new HumanMessage(userPrompt),
     ]);
 
-    // Update the in-memory list
+    // Update the persistent storage
     currentGroceryList = result.final_list;
+    await storage.saveList(currentGroceryList);
+    console.log(`Saved ${currentGroceryList.length} items to storage`);
 
     return res.json({ items: result.final_list, reasoning: result.reasoning });
   } catch (err: any) {
@@ -267,6 +284,7 @@ Task: Extract all ingredients from this recipe and normalize them for a grocery 
     );
     
     currentGroceryList = [...currentGroceryList, ...newIngredients];
+    await storage.saveList(currentGroceryList);
 
     return res.json({ 
       ingredients: result.ingredients, 
@@ -333,6 +351,7 @@ Task: Extract all ingredients from this recipe content and normalize them for a 
     );
     
     currentGroceryList = [...currentGroceryList, ...newIngredients];
+    await storage.saveList(currentGroceryList);
 
     return res.json({ 
       ingredients: result.ingredients, 
@@ -354,9 +373,15 @@ app.get('/api/grocery', (req, res) => {
 });
 
 // Clear grocery list
-app.delete('/api/grocery', (req, res) => {
-  currentGroceryList = [];
-  return res.json({ items: [], message: 'Grocery list cleared' });
+app.delete('/api/grocery', async (req, res) => {
+  try {
+    currentGroceryList = [];
+    await storage.clearList();
+    return res.json({ items: [], message: 'Grocery list cleared' });
+  } catch (error) {
+    console.error('Failed to clear grocery list:', error);
+    return res.status(500).json({ error: 'Failed to clear grocery list' });
+  }
 });
 
 // Export for testing
@@ -366,10 +391,17 @@ export { app, currentGroceryList };
 export const getCurrentGroceryList = () => currentGroceryList;
 export const clearGroceryList = () => { currentGroceryList = []; };
 
-// Only start the server if not in test environment
-if (process.env.NODE_ENV !== 'test') {
-  const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
-  app.listen(PORT, () => console.log(`Grocery API running on http://localhost:${PORT}`));
+// Initialize storage and start server
+async function startServer() {
+  await initializeStorage();
+  
+  // Only start the server if not in test environment
+  if (process.env.NODE_ENV !== 'test') {
+    const PORT = process.env.PORT ? Number(process.env.PORT) : 8787;
+    app.listen(PORT, () => console.log(`Grocery API running on http://localhost:${PORT}`));
+  }
 }
+
+startServer().catch(console.error);
 
 
