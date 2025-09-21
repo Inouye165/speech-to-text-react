@@ -6,6 +6,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import * as cheerio from 'cheerio';
 import { getStorage } from './storage';
+import { getBackupManager } from './backup';
 
 const app = express();
 app.use(cors());
@@ -381,6 +382,68 @@ app.delete('/api/grocery', async (req, res) => {
   } catch (error) {
     console.error('Failed to clear grocery list:', error);
     return res.status(500).json({ error: 'Failed to clear grocery list' });
+  }
+});
+
+// Backup management endpoints
+app.get('/api/backups', async (req, res) => {
+  try {
+    const backupManager = getBackupManager();
+    const backups = await backupManager.listBackups();
+    const backupInfos = await Promise.all(
+      backups.map(async (backup) => {
+        const info = await backupManager.getBackupInfo(backup);
+        return {
+          name: backup,
+          ...info
+        };
+      })
+    );
+    return res.json({ backups: backupInfos });
+  } catch (error) {
+    console.error('Failed to list backups:', error);
+    return res.status(500).json({ error: 'Failed to list backups' });
+  }
+});
+
+app.post('/api/backups/create', async (req, res) => {
+  try {
+    const backupManager = getBackupManager();
+    const dataFile = path.join(process.cwd(), 'data', 'grocery-list.json');
+    const backupPath = await backupManager.createBackup(dataFile);
+    
+    if (backupPath) {
+      return res.json({ message: 'Backup created successfully', backupPath });
+    } else {
+      return res.status(500).json({ error: 'Failed to create backup' });
+    }
+  } catch (error) {
+    console.error('Failed to create backup:', error);
+    return res.status(500).json({ error: 'Failed to create backup' });
+  }
+});
+
+app.post('/api/backups/restore/:backupName', async (req, res) => {
+  try {
+    const { backupName } = req.params;
+    const backupManager = getBackupManager();
+    const dataFile = path.join(process.cwd(), 'data', 'grocery-list.json');
+    
+    const success = await backupManager.restoreBackup(backupName, dataFile);
+    
+    if (success) {
+      // Reload the grocery list from storage
+      currentGroceryList = await storage.getList();
+      return res.json({ 
+        message: 'Backup restored successfully', 
+        items: currentGroceryList 
+      });
+    } else {
+      return res.status(404).json({ error: 'Backup not found or restore failed' });
+    }
+  } catch (error) {
+    console.error('Failed to restore backup:', error);
+    return res.status(500).json({ error: 'Failed to restore backup' });
   }
 });
 

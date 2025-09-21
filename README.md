@@ -14,6 +14,7 @@ A comprehensive web application that combines speech-to-text functionality with 
 - ✅ **Intelligent grocery list management** using natural language
 - ✅ **Recipe ingredient extraction** from text and URLs
 - ✅ **Persistent storage** - your grocery list survives server restarts
+- ✅ **Automatic backup system** - protects against data loss
 - ✅ **Manual text editing and clearing**
 - ✅ **Copy transcribed text to clipboard** (with fallback and status)
 - ✅ **Modern, responsive user interface**
@@ -24,6 +25,8 @@ A comprehensive web application that combines speech-to-text functionality with 
 - 🌐 **URL recipe parsing** - paste recipe URLs and extract ingredients automatically
 - 🔄 **Smart duplicate prevention** - avoids adding duplicate items to your list
 - 💾 **Persistent data storage** - file-based storage that can be easily migrated to a database
+- 🛡️ **Automatic backups** - creates timestamped backups before each save operation
+- 🔄 **Backup restoration** - restore from any previous backup via API
 - 🎛️ **Auto-restart recording** - configurable option to keep recording continuously
 
 ## 🏗️ How It Works
@@ -157,8 +160,11 @@ speech-to-text-react/
 ├── server/
 │   ├── index.ts            # Express API server
 │   ├── storage.ts          # Persistent storage abstraction
+│   ├── backup.ts           # Backup management system
 │   └── __tests__/          # Backend tests
 ├── data/                   # Persistent storage directory
+│   ├── grocery-list.json   # Main grocery list data
+│   └── backups/            # Automatic backup files
 └── public/                 # Static assets
 ```
 
@@ -203,6 +209,11 @@ Ensure your production environment has:
 ### Recipe Processing
 - `POST /api/recipe` - Extract ingredients from recipe text
 - `POST /api/recipe-url` - Extract ingredients from recipe URL
+
+### Backup Management
+- `GET /api/backups` - List all available backups
+- `POST /api/backups/create` - Create a manual backup
+- `POST /api/backups/restore/:backupName` - Restore from a specific backup
 
 ## 🔒 Privacy & Security
 

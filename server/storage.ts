@@ -1,5 +1,6 @@
 import fs from 'fs-extra';
 import path from 'path';
+import { getBackupManager } from './backup';
 
 // Storage abstraction - can be easily replaced with a real database
 export interface GroceryListStorage {
@@ -41,6 +42,16 @@ class FileStorage implements GroceryListStorage {
   async saveList(items: string[]): Promise<void> {
     try {
       await fs.ensureDir(this.dataDir);
+      
+      // Create backup before saving if file exists and has content
+      if (await fs.pathExists(this.dataFile)) {
+        const existingData = await fs.readJson(this.dataFile);
+        if (existingData.items && existingData.items.length > 0) {
+          const backupManager = getBackupManager();
+          await backupManager.createBackup(this.dataFile);
+        }
+      }
+      
       const data = {
         items,
         lastUpdated: new Date().toISOString(),
